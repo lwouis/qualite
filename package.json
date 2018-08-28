@@ -1,0 +1,43 @@
+{
+  "name": "qualite",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lwouis/qualite"
+  },
+  "files": [
+    "/dist"
+  ],
+  "directories": {
+    "lib": "dist"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "jscpd": "jscpd",
+    "cloc": "cloc src",
+    "tslint": "tslint --config tslint.json --project tsconfig.json",
+    "tslint-fix": "npm run tslint -- --fix"
+  },
+  "dependencies": {
+    "chalk": "2.4.1",
+    "immutable": "4.0.0-rc.9",
+    "pino": "4.17.3",
+    "recursive-readdir": "2.2.2",
+    "rxjs": "6.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "10.9.2",
+    "@types/pino": "4.16.0",
+    "@types/recursive-readdir": "2.2.0",
+    "cloc": "2.3.3",
+    "jscpd": "0.6.22",
+    "npx": "10.2.0",
+    "ts-node": "7.0.1",
+    "tslint": "5.11.0",
+    "typescript": "3.0.1"
+  },
+  "engines": {
+    "node": ">=6"
+  }
+}

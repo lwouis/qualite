@@ -1,0 +1,23 @@
+language: node_js
+
+node_js:
+  - "8"
+
+before_install:
+  - npm i -g npm@5.7.0
+
+install:
+  - npm ci
+
+script:
+  - npm run cloc
+  - npm run jscpd
+  - npm run tslint
+  - npm run build
+
+deploy:
+  provider: npm
+  email: "lwouis@gmail.com"
+  api_key: "9f3970fa-2d23-4c98-8382-27d1ee5c26e1"
+  on:
+    tags: true
