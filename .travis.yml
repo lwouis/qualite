@@ -21,3 +21,4 @@ deploy:
   api_key: "9f3970fa-2d23-4c98-8382-27d1ee5c26e1"
   on:
     tags: true
+  skip_cleanup: true
