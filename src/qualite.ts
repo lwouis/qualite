@@ -48,6 +48,17 @@ export enum Files {
   StagedInGit,
 }
 
+function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, bl: PatternBlacklist, m: MaxParallel, v: Verbosity): void {
+  const l = createLogger(v);
+  filesToRunOn(f, wl, bl).subscribe(files => {
+    if (files.size === 0) {
+      nothingToRun(l);
+    } else {
+      runAll(files, p, m, l, v);
+    }
+  });
+}
+
 function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): void {
   l.info(messageForHeader(f));
   runInParallel(f, p, m).pipe(
@@ -61,23 +72,12 @@ function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logg
   });
 }
 
-function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, bl: PatternBlacklist, m: MaxParallel, v: Verbosity): void {
-  const l = createLogger(v);
-  filesToRunOn(f, wl, bl).subscribe(files => {
-    if (files.size === 0) {
-      nothingToRun(l);
-    } else {
-      runAll(files, p, m, l, v);
-    }
-  });
-}
-
 function runInParallel(f: FilesToProcess, p: ProcessToRun, m: MaxParallel): Observable<ChildProcessAndFileName> {
   return from(f.toArray()).pipe(mergeMap(a => defer(() => execProcess(p, a)), m));
 }
 
 function nothingToRun(l: pino.Logger): void {
-  l.info(messageForNoFile());
+  l.info('No file to process');
   process.exit(0);
 }
 
@@ -93,9 +93,8 @@ function messageForOneFile(f: FileName, s: StdOut, p: ProcessCode, v: Verbosity)
   const success = p === 0;
   const color = success ? 'green' : 'red';
   const symbol = success ? '✓' : '✗';
-  const stdOutTrimmed = s.trim();
   const shouldLog = !success || v === Verbosity.LogEverything;
-  const stdOut = shouldLog && stdOutTrimmed !== '' ? '\n' + stdOutTrimmed : '';
+  const stdOut = shouldLog && s !== '' ? `\n${s}` : '';
   const exitCode = success ? '' : ` (exit code: ${p})`;
   return chalk[color](`  ${symbol} ${f}${exitCode}${stdOut}`);
 }
@@ -109,10 +108,6 @@ function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity): Mess
     const failureLines = failures.reduce((acc, e) => acc + messageForOneFile(e.filename, e.stdout, e.code, v) + '\n', '');
     return chalk['red'](`${summary}${failures.size}/${p.size} failed\n\n${failureLines}`);
   }
-}
-
-function messageForNoFile(): MessageToLog {
-  return chalk['green']('No file to process');
 }
 
 function messageForHeader(f: FilesToProcess): MessageToLog {
@@ -134,6 +129,9 @@ function targetBranch(): GitBranch {
 }
 
 function linesFromStdout(a: StdOut): FilesToProcess {
+  if (a === '') {
+    return Set<string>();
+  }
   return Set<string>(a.split(/\r?\n/));
 }
 
