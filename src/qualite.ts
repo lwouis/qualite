@@ -1,10 +1,10 @@
 import chalk from 'chalk';
 import {cpus} from 'os';
-import {Map, Set} from 'immutable';
+import {List, Map, Set} from 'immutable';
 import * as pino from 'pino';
-import {catchError, flatMap, map, mergeMap, reduce} from 'rxjs/operators';
+import {catchError, map, mergeMap, reduce} from 'rxjs/operators';
 import {defer, forkJoin, from, Observable, of} from 'rxjs';
-import {execP, ProcessCode, StdOut} from './utils';
+import {ChildProcess, execP, ProcessCode, StdOut} from './utils';
 import * as recursive from 'recursive-readdir';
 
 /**
@@ -48,54 +48,78 @@ export enum Files {
   StagedInGit,
 }
 
+function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): void {
+  l.info(messageForHeader(f));
+  runInParallel(f, p, m).pipe(
+    reduce((acc, e: ChildProcessAndFileName) => {
+      l.info(messageForOneFile(e.filename, e.stdout, e.code, v));
+      return acc.push(e);
+    }, List<ChildProcessAndFileName>()),
+  ).subscribe(a => {
+    l.info(messageForSummary(a, v));
+    process.exit(a.some(b => b.code !== 0) ? 1 : 0);
+  });
+}
+
 function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, bl: PatternBlacklist, m: MaxParallel, v: Verbosity): void {
   const l = createLogger(v);
-  processFiles(filesToRunOn(f, wl, bl), p, m, l, v)
-    .subscribe(a => {
-      l.info('exit with code ' + a);
-      process.exit(a);
-    });
+  filesToRunOn(f, wl, bl).subscribe(files => {
+    if (files.size === 0) {
+      nothingToRun(l);
+    } else {
+      runAll(files, p, m, l, v);
+    }
+  });
 }
 
-function processFiles(f: Observable<FilesToProcess>, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): Observable<ProcessCode> {
-  return f.pipe(
-    flatMap(a => {
-      if (a.count() === 0) {
-        l.info(resultMessage('No file to process', '', true, v));
-        return of(0);
-      }
-      return runInBatches(a, p, m, l, v);
-    }),
-    reduce((acc, e) => e !== 0 ? e : acc),
-  );
+function runInParallel(f: FilesToProcess, p: ProcessToRun, m: MaxParallel): Observable<ChildProcessAndFileName> {
+  return from(f.toArray()).pipe(mergeMap(a => defer(() => execProcess(p, a)), m));
 }
 
-function runInBatches(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): Observable<ProcessCode> {
-  return from(f.toArray()).pipe(mergeMap(a => defer(() => execProcess(p, a, l, v)), m));
+function nothingToRun(l: pino.Logger): void {
+  l.info(messageForNoFile());
+  process.exit(0);
 }
 
-function execProcess(p: ProcessToRun, f: FileName, l: pino.Logger, v: Verbosity): Observable<ProcessCode> {
+function execProcess(p: ProcessToRun, f: FileName): Observable<ChildProcessAndFileName> {
   return execP(`${p} ${f} 2>&1`)
     .pipe(
-      map(a => {
-        l.info(resultMessage(f, a.stdout, a.code === 0, v));
-        return a.code;
-      }),
-      catchError(a => {
-        l.info(resultMessage(f, a.stdout, a.code === 0, v));
-        return of(a.code);
-      }),
+      catchError(a => of(a)),
+      map(a => Object.assign(a, {filename: f})),
     );
 }
 
-function resultMessage(f: FileName, std: StdOut, s: Success, v: Verbosity): string {
-  const color = s ? 'green' : 'red';
-  const symbol = s ? '✓' : '✗';
-  const stdOut = !s || v === Verbosity.LogEverything ? '\n' + std : '';
-  return chalk[color](`  ${symbol} ${f}`) + stdOut;
+function messageForOneFile(f: FileName, s: StdOut, p: ProcessCode, v: Verbosity): MessageToLog {
+  const success = p === 0;
+  const color = success ? 'green' : 'red';
+  const symbol = success ? '✓' : '✗';
+  const stdOutTrimmed = s.trim();
+  const shouldLog = !success || v === Verbosity.LogEverything;
+  const stdOut = shouldLog && stdOutTrimmed !== '' ? '\n' + stdOutTrimmed : '';
+  const exitCode = success ? '' : ` (exit code: ${p})`;
+  return chalk[color](`  ${symbol} ${f}${exitCode}${stdOut}`);
 }
 
-function targetBranch(): string {
+function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity): MessageToLog {
+  const failures = p.filter(a => a.code !== 0);
+  const summary = '\nSummary: ';
+  if (failures.size === 0) {
+    return chalk['green'](`${summary}${p.size}/${p.size} succeeded`);
+  } else {
+    const failureLines = failures.reduce((acc, e) => acc + messageForOneFile(e.filename, e.stdout, e.code, v) + '\n', '');
+    return chalk['red'](`${summary}${failures.size}/${p.size} failed\n\n${failureLines}`);
+  }
+}
+
+function messageForNoFile(): MessageToLog {
+  return chalk['green']('No file to process');
+}
+
+function messageForHeader(f: FilesToProcess): MessageToLog {
+  return `${f.size} files to process:\n`;
+}
+
+function targetBranch(): GitBranch {
   if (process.env.STASH_PULL_REQUEST_BRANCH_DESTINATION) {
     // SW2
     return 'stash/' + process.env.STASH_PULL_REQUEST_BRANCH_DESTINATION;
@@ -159,9 +183,11 @@ function createLogger(v: Verbosity): pino.Logger {
 }
 
 type ProcessToRun = string & {readonly __unique?: unique symbol};
+type MessageToLog = string & {readonly __unique?: unique symbol};
+type GitBranch = string & {readonly __unique?: unique symbol};
 type FileName = string & {readonly __unique?: unique symbol};
-type Success = boolean & {readonly __unique?: unique symbol};
 type MaxParallel = number & {readonly __unique?: unique symbol};
 type PatternWhitelist = Set<RegExp> & {readonly __unique?: unique symbol};
 type PatternBlacklist = Set<RegExp> & {readonly __unique?: unique symbol};
 type FilesToProcess = Set<string> & {readonly __unique?: unique symbol};
+type ChildProcessAndFileName = ChildProcess & {filename: FileName};
