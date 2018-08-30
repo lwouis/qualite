@@ -1,12 +1,12 @@
 {
   "name": "qualite",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/lwouis/qualite"
   },
   "files": [
-    "/dist"
+    "dist"
   ],
   "directories": {
     "lib": "dist"
