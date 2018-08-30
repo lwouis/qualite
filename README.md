@@ -4,9 +4,9 @@ Qualite runs a given process on a list of files. Typical use is to run a quality
  
 # Usage
 
-Qualite has no CLI interface. Instead you call it programmatically in TS.
+Qualite has no CLI interface. Instead you call it programmatically using TS.
 
-* Make a file which describe your quality steps, like `example.ts`:
+* Make a file which describes your quality steps, like `example.ts`:
 
   ```typescript
   import {Files, qualite, Verbosity} from 'qualite';
@@ -29,11 +29,19 @@ Qualite has no CLI interface. Instead you call it programmatically in TS.
     "cppcheck": "ts-node example.ts cppcheck"
   }
   ```
+  
+* If you really want a one-liner, or you don't want to create the extra file, you can do something like this:
+
+  ```
+  "scripts": {
+    "jscpd": "ts-node -p \"require('qualite').qualite('jscpd')\"",
+  }
+  ```
 
 # FAQ
 
 ## Why no command line interface?
 
-The CLI is not typed, error-prone, and not ergonomic when passing a big list of flags for the white/blacklists. Because it is programmatic, you can also reuse lists, or generate them dynamically.
+The CLI is not typed, error-prone, and not ergonomic when passing a big list of flags for the white/blacklists.
 
-For these reasons I decided to go with a Typescript interface.
+For these reasons I decided to go with a Typescript interface. It has type guarantees, and you can reuse lists or generate them dynamically.
