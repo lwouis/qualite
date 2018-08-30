@@ -116,7 +116,8 @@ function messageForNoFile(): MessageToLog {
 }
 
 function messageForHeader(f: FilesToProcess): MessageToLog {
-  return `${f.size} files to process:\n`;
+  const plural = f.size > 1 ? 's' : '';
+  return `${f.size} file${plural} to process:\n`;
 }
 
 function targetBranch(): GitBranch {
