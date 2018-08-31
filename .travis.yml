@@ -15,9 +15,9 @@ install:
 
 script:
 - npm run cloc
-- npx jscpd
+- npm run jscpd
 - npm run tslint
-- npx tsc
+- npm run build
 
 after_success:
 - npm run travis-deploy-once "npm run semantic-release"
