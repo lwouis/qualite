@@ -105,8 +105,8 @@ export function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity
   if (failures.size === 0) {
     return chalk['green'](`${summary}${p.size}/${p.size} succeeded`);
   } else {
-    const failureLines = failures.reduce((acc, e) => acc + messageForOneFile(e.filename, e.stdout, e.code, v) + '\n', '');
-    return chalk['red'](`${summary}${failures.size}/${p.size} failed\n\n${failureLines}`);
+    const failureLines = failures.map(e => messageForOneFile(e.filename, e.stdout, e.code, v)).join('\n');
+    return chalk['red'](`${summary}${failures.size}/${p.size} failed\n\n`) + failureLines;
   }
 }
 

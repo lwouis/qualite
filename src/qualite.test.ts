@@ -40,6 +40,17 @@ Summary: 1/1 succeeded`)));
     expect(messageForSummary(List().push(mockFile(0), mockFile(0), mockFile(0)), Verbosity.LogEverything)).toBe(mockGreenLog(`
 
 Summary: 3/3 succeeded`)));
+
+
+  test('1 file failed', () => {
+    expect(messageForSummary(List().push(mockFile(1)), Verbosity.LogEverything)).toBe(mockRedLog(`
+
+Summary: 1/1 failed
+
+`) + mockRedLog(`
+  ✗ file1 (exit code: 1)
+line1`));
+  });
 });
 
 function mockLog(s: string, c: 'green' | 'red'): string {
