@@ -4,7 +4,7 @@ import {List, Map, Set} from 'immutable';
 import * as pino from 'pino';
 import {catchError, map, mergeMap, reduce} from 'rxjs/operators';
 import {defer, forkJoin, from, Observable, of} from 'rxjs';
-import {ChildProcess, execP, ProcessCode, StdOut} from './utils';
+import {ChildProcess, exec$, ProcessCode, StdOut} from './utils';
 import * as recursive from 'recursive-readdir';
 
 /**
@@ -48,7 +48,7 @@ export enum Files {
   StagedInGit,
 }
 
-function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, bl: PatternBlacklist, m: MaxParallel, v: Verbosity): void {
+export function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, bl: PatternBlacklist, m: MaxParallel, v: Verbosity): void {
   const l = createLogger(v);
   filesToRunOn(f, wl, bl).subscribe(files => {
     if (files.size === 0) {
@@ -59,7 +59,7 @@ function runProcessForEachFile(p: ProcessToRun, f: Files, wl: PatternWhitelist, 
   });
 }
 
-function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): void {
+export function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logger, v: Verbosity): void {
   l.info(messageForHeader(f));
   runInParallel(f, p, m).pipe(
     reduce((acc, e: ChildProcessAndFileName) => {
@@ -72,24 +72,24 @@ function runAll(f: FilesToProcess, p: ProcessToRun, m: MaxParallel, l: pino.Logg
   });
 }
 
-function runInParallel(f: FilesToProcess, p: ProcessToRun, m: MaxParallel): Observable<ChildProcessAndFileName> {
+export function runInParallel(f: FilesToProcess, p: ProcessToRun, m: MaxParallel): Observable<ChildProcessAndFileName> {
   return from(f.toArray()).pipe(mergeMap(a => defer(() => execProcess(p, a)), m));
 }
 
-function nothingToRun(l: pino.Logger): void {
+export function nothingToRun(l: pino.Logger): void {
   l.info('No file to process');
   process.exit(0);
 }
 
-function execProcess(p: ProcessToRun, f: FileName): Observable<ChildProcessAndFileName> {
-  return execP(`${p} ${f} 2>&1`)
+export function execProcess(p: ProcessToRun, f: FileName): Observable<ChildProcessAndFileName> {
+  return exec$(`${p} ${f} 2>&1`)
     .pipe(
       catchError(a => of(a)),
       map(a => Object.assign(a, {filename: f})),
     );
 }
 
-function messageForOneFile(f: FileName, s: StdOut, p: ProcessCode, v: Verbosity): MessageToLog {
+export function messageForOneFile(f: FileName, s: StdOut, p: ProcessCode, v: Verbosity): MessageToLog {
   const success = p === 0;
   const color = success ? 'green' : 'red';
   const symbol = success ? '✓' : '✗';
@@ -99,7 +99,7 @@ function messageForOneFile(f: FileName, s: StdOut, p: ProcessCode, v: Verbosity)
   return chalk[color](`  ${symbol} ${f}${exitCode}${stdOut}`);
 }
 
-function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity): MessageToLog {
+export function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity): MessageToLog {
   const failures = p.filter(a => a.code !== 0);
   const summary = '\nSummary: ';
   if (failures.size === 0) {
@@ -110,12 +110,12 @@ function messageForSummary(p: List<ChildProcessAndFileName>, v: Verbosity): Mess
   }
 }
 
-function messageForHeader(f: FilesToProcess): MessageToLog {
+export function messageForHeader(f: FilesToProcess): MessageToLog {
   const plural = f.size > 1 ? 's' : '';
   return `${f.size} file${plural} to process:\n`;
 }
 
-function targetBranch(): GitBranch {
+export function targetBranch(): GitBranch {
   if (process.env.STASH_PULL_REQUEST_BRANCH_DESTINATION) {
     // SW2
     return 'stash/' + process.env.STASH_PULL_REQUEST_BRANCH_DESTINATION;
@@ -128,33 +128,33 @@ function targetBranch(): GitBranch {
   return 'origin/master';
 }
 
-function linesFromStdout(a: StdOut): FilesToProcess {
+export function linesFromStdout(a: StdOut): FilesToProcess {
   if (a === '') {
     return Set<string>();
   }
   return Set<string>(a.split(/\r?\n/));
 }
 
-function modifiedSinceOriginMasterInGit(): Observable<FilesToProcess> {
+export function modifiedSinceOriginMasterInGit(): Observable<FilesToProcess> {
   return forkJoin([
-    execP(`git --no-pager diff --name-only --diff-filter=AM ${targetBranch()}...HEAD`),
-    execP('git --no-pager diff --name-only --diff-filter=AM --staged'),
+    exec$(`git --no-pager diff --name-only --diff-filter=AM ${targetBranch()}...HEAD`),
+    exec$('git --no-pager diff --name-only --diff-filter=AM --staged'),
   ]).pipe(map(([a, b]) => linesFromStdout(a.stdout + b.stdout)));
 }
 
-function indexedInGit(): Observable<FilesToProcess> {
-  return execP('git ls-files').pipe(map(a => linesFromStdout(a.stdout)));
+export function indexedInGit(): Observable<FilesToProcess> {
+  return exec$('git ls-files').pipe(map(a => linesFromStdout(a.stdout)));
 }
 
-function allInPwd(): Observable<FilesToProcess> {
+export function allInPwd(): Observable<FilesToProcess> {
   return from(recursive(process.cwd()).then(f => Set<string>(f)));
 }
 
-function stagedInGit(): Observable<FilesToProcess> {
-  return execP('git --no-pager diff --name-only --diff-filter=AM --staged').pipe(map(a => linesFromStdout(a.stdout)));
+export function stagedInGit(): Observable<FilesToProcess> {
+  return exec$('git --no-pager diff --name-only --diff-filter=AM --staged').pipe(map(a => linesFromStdout(a.stdout)));
 }
 
-function _filesToRunOn(f: Files): Observable<FilesToProcess> {
+export function _filesToRunOn(f: Files): Observable<FilesToProcess> {
   return Map<Files, () => Observable<FilesToProcess>>()
     .set(Files.AllInPwd, allInPwd)
     .set(Files.IndexedInGit, indexedInGit)
@@ -163,7 +163,7 @@ function _filesToRunOn(f: Files): Observable<FilesToProcess> {
     .get(f)();
 }
 
-function filesToRunOn(fi: Files, wl: PatternWhitelist, bl: PatternBlacklist): Observable<FilesToProcess> {
+export function filesToRunOn(fi: Files, wl: PatternWhitelist, bl: PatternBlacklist): Observable<FilesToProcess> {
   return _filesToRunOn(fi)
     .pipe(
       map(files => wl.size > 0 ? files.filter(f => wl.some(wlp => wlp.test(f))) : files),
@@ -172,7 +172,7 @@ function filesToRunOn(fi: Files, wl: PatternWhitelist, bl: PatternBlacklist): Ob
     );
 }
 
-function createLogger(v: Verbosity): pino.Logger {
+export function createLogger(v: Verbosity): pino.Logger {
   return pino({
     prettyPrint: {
       formatter: line => line.msg,
@@ -181,12 +181,12 @@ function createLogger(v: Verbosity): pino.Logger {
   });
 }
 
-type ProcessToRun = string & {readonly __unique?: unique symbol};
-type MessageToLog = string & {readonly __unique?: unique symbol};
-type GitBranch = string & {readonly __unique?: unique symbol};
-type FileName = string & {readonly __unique?: unique symbol};
-type MaxParallel = number & {readonly __unique?: unique symbol};
-type PatternWhitelist = Set<RegExp> & {readonly __unique?: unique symbol};
-type PatternBlacklist = Set<RegExp> & {readonly __unique?: unique symbol};
-type FilesToProcess = Set<string> & {readonly __unique?: unique symbol};
-type ChildProcessAndFileName = ChildProcess & {filename: FileName};
+export type ProcessToRun = string & {readonly __unique?: unique symbol};
+export type MessageToLog = string & {readonly __unique?: unique symbol};
+export type GitBranch = string & {readonly __unique?: unique symbol};
+export type FileName = string & {readonly __unique?: unique symbol};
+export type MaxParallel = number & {readonly __unique?: unique symbol};
+export type PatternWhitelist = Set<RegExp> & {readonly __unique?: unique symbol};
+export type PatternBlacklist = Set<RegExp> & {readonly __unique?: unique symbol};
+export type FilesToProcess = Set<string> & {readonly __unique?: unique symbol};
+export type ChildProcessAndFileName = ChildProcess & {filename: FileName};
