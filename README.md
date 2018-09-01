@@ -1,7 +1,11 @@
 # Purpose
 
 Qualite runs a given process on a list of files. Typical use is to run a quality tool such as a formatter of linter on all the project files during CI, or only on git staged files in a pre-commit hook.
- 
+
+# Install
+
+`npm install qualite`
+
 # Usage
 
 Qualite has no CLI interface. Instead you call it programmatically using TS.
@@ -37,6 +41,10 @@ Qualite has no CLI interface. Instead you call it programmatically using TS.
     "jscpd": "ts-node -p \"require('qualite').qualite('jscpd')\"",
   }
   ```
+
+# Changelog
+
+Changelog is available on [Github releases page](https://github.com/lwouis/qualite/releases)
 
 # FAQ
 
