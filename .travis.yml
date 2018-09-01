@@ -19,6 +19,7 @@ install:
 - npm ci
 
 script:
+- commitlint-travis
 - npm run cloc
 - npm run jscpd
 - npm run tslint
